@@ -2,44 +2,39 @@ import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 
 async function main() {
+  // Delete existing data (for clean slate)
+  await prisma.reservation.deleteMany({});
+  await prisma.equipment.deleteMany({});
+  await prisma.user.deleteMany({});
+
   // Create sample equipment
   const equipment = await Promise.all([
-    prisma.equipment.upsert({
-      where: { name: 'Pressure Washer' },
-      update: {},
-      create: {
+    prisma.equipment.create({
+      data: {
         name: 'Pressure Washer',
         status: 'available',
       },
     }),
-    prisma.equipment.upsert({
-      where: { name: 'Scaffolding Set' },
-      update: {},
-      create: {
+    prisma.equipment.create({
+      data: {
         name: 'Scaffolding Set',
         status: 'available',
       },
     }),
-    prisma.equipment.upsert({
-      where: { name: 'Hydraulic Lift' },
-      update: {},
-      create: {
+    prisma.equipment.create({
+      data: {
         name: 'Hydraulic Lift',
         status: 'available',
       },
     }),
-    prisma.equipment.upsert({
-      where: { name: 'Concrete Mixer' },
-      update: {},
-      create: {
+    prisma.equipment.create({
+      data: {
         name: 'Concrete Mixer',
         status: 'available',
       },
     }),
-    prisma.equipment.upsert({
-      where: { name: 'Compressor' },
-      update: {},
-      create: {
+    prisma.equipment.create({
+      data: {
         name: 'Compressor',
         status: 'available',
       },
@@ -50,10 +45,8 @@ async function main() {
 
   // Create sample user
   const hashedPassword = await bcrypt.hash('TestPassword123!', 10);
-  const user = await prisma.user.upsert({
-    where: { email: 'customer@example.com' },
-    update: {},
-    create: {
+  const user = await prisma.user.create({
+    data: {
       email: 'customer@example.com',
       password: hashedPassword,
       name: 'John Doe',

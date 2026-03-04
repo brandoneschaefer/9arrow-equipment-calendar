@@ -81,6 +81,36 @@ export async function PATCH(
       notes,
     } = await request.json();
 
+    // Use existing values if not provided
+    const newCheckIn = checkInTime ? new Date(checkInTime) : reservation.checkInTime;
+    const newCheckOut = checkOutTime ? new Date(checkOutTime) : reservation.checkOutTime;
+
+    if (newCheckOut <= newCheckIn) {
+      return NextResponse.json(
+        { error: 'Check-out time must be after check-in time' },
+        { status: 400 }
+      );
+    }
+
+    // Check for overlapping reservations (excluding current reservation)
+    const overlapping = await prisma.reservation.findFirst({
+      where: {
+        equipmentId: reservation.equipmentId,
+        id: { not: params.id },
+        AND: [
+          { checkInTime: { lt: newCheckOut } },
+          { checkOutTime: { gt: newCheckIn } },
+        ],
+      },
+    });
+
+    if (overlapping) {
+      return NextResponse.json(
+        { error: `This equipment is already reserved from ${overlapping.checkInTime.toISOString().split('T')[0]} to ${overlapping.checkOutTime.toISOString().split('T')[0]}. Please choose different dates.` },
+        { status: 409 }
+      );
+    }
+
     const updatedReservation = await prisma.reservation.update({
       where: { id: params.id },
       data: {
@@ -88,8 +118,8 @@ export async function PATCH(
         ...(contactName && { contactName }),
         ...(contactEmail && { contactEmail }),
         ...(contactPhone && { contactPhone }),
-        ...(checkInTime && { checkInTime: new Date(checkInTime) }),
-        ...(checkOutTime && { checkOutTime: new Date(checkOutTime) }),
+        ...(checkInTime && { checkInTime: newCheckIn }),
+        ...(checkOutTime && { checkOutTime: newCheckOut }),
         ...(notes !== undefined && { notes }),
       },
       include: {
@@ -101,10 +131,10 @@ export async function PATCH(
     if (updatedReservation.hubspotDealId) {
       try {
         const checkInDate = checkInTime
-          ? new Date(checkInTime).toISOString().split('T')[0]
+          ? newCheckIn.toISOString().split('T')[0]
           : undefined;
         const checkOutDate = checkOutTime
-          ? new Date(checkOutTime).toISOString().split('T')[0]
+          ? newCheckOut.toISOString().split('T')[0]
           : undefined;
 
         await syncDealToHubSpot(

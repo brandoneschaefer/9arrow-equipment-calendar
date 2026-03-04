@@ -64,6 +64,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check for overlapping reservations
+    const checkIn = new Date(checkInTime);
+    const checkOut = new Date(checkOutTime);
+
+    if (checkOut <= checkIn) {
+      return NextResponse.json(
+        { error: 'Check-out time must be after check-in time' },
+        { status: 400 }
+      );
+    }
+
+    // Find overlapping reservations for this equipment
+    const overlapping = await prisma.reservation.findFirst({
+      where: {
+        equipmentId,
+        AND: [
+          { checkInTime: { lt: checkOut } },
+          { checkOutTime: { gt: checkIn } },
+        ],
+      },
+    });
+
+    if (overlapping) {
+      return NextResponse.json(
+        { error: `This equipment is already reserved from ${overlapping.checkInTime.toISOString().split('T')[0]} to ${overlapping.checkOutTime.toISOString().split('T')[0]}. Please choose different dates.` },
+        { status: 409 }
+      );
+    }
+
     // Create reservation
     const reservation = await prisma.reservation.create({
       data: {
@@ -73,8 +102,8 @@ export async function POST(request: NextRequest) {
         contactName,
         contactEmail: contactEmail || null,
         contactPhone: contactPhone || null,
-        checkInTime: new Date(checkInTime),
-        checkOutTime: new Date(checkOutTime),
+        checkInTime: checkIn,
+        checkOutTime: checkOut,
         notes: notes || null,
       },
       include: {
@@ -85,8 +114,8 @@ export async function POST(request: NextRequest) {
     // Sync to HubSpot
     try {
       const dealName = `${companyName} - ${reservation.equipment.name} Rental`;
-      const checkInDate = new Date(checkInTime).toISOString().split('T')[0];
-      const checkOutDate = new Date(checkOutTime).toISOString().split('T')[0];
+      const checkInDate = checkIn.toISOString().split('T')[0];
+      const checkOutDate = checkOut.toISOString().split('T')[0];
 
       const hubspotDeal = await syncDealToHubSpot({
         dealname: dealName,
