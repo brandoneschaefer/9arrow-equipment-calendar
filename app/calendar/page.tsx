@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Plus, X } from 'lucide-react';
+import { Calendar, Clock, Plus, X, Trash2 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
@@ -32,6 +32,7 @@ export default function CalendarPage() {
   const [selectedEquipment, setSelectedEquipment] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     companyName: '',
     contactName: '',
@@ -122,6 +123,31 @@ export default function CalendarPage() {
     }
   };
 
+  const handleDelete = async (reservationId: string) => {
+    if (!confirm('Are you sure you want to delete this reservation?')) {
+      return;
+    }
+
+    setDeletingId(reservationId);
+    try {
+      const response = await fetch(`/api/reservations/${reservationId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete reservation');
+      }
+
+      setReservations(reservations.filter((r) => r.id !== reservationId));
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete reservation');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   if (status === 'loading' || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -182,62 +208,77 @@ export default function CalendarPage() {
                     {reservationsByEquipment[eq.id].map((reservation) => (
                       <div
                         key={reservation.id}
-                        className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
+                        className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition flex justify-between items-start"
                       >
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <h3 className="font-bold text-gray-900">
-                              {reservation.companyName}
-                            </h3>
-                            <p className="text-gray-600">
-                              Contact: {reservation.contactName}
-                            </p>
-                            {reservation.contactEmail && (
-                              <p className="text-gray-600 text-sm">
-                                {reservation.contactEmail}
+                        <div className="flex-1">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <h3 className="font-bold text-gray-900">
+                                {reservation.companyName}
+                              </h3>
+                              <p className="text-gray-600">
+                                Contact: {reservation.contactName}
                               </p>
-                            )}
-                            {reservation.contactPhone && (
-                              <p className="text-gray-600 text-sm">
-                                {reservation.contactPhone}
-                              </p>
-                            )}
-                          </div>
+                              {reservation.contactEmail && (
+                                <p className="text-gray-600 text-sm">
+                                  {reservation.contactEmail}
+                                </p>
+                              )}
+                              {reservation.contactPhone && (
+                                <p className="text-gray-600 text-sm">
+                                  {reservation.contactPhone}
+                                </p>
+                              )}
+                            </div>
 
-                          <div className="text-right">
-                            <div className="flex items-center justify-end gap-2 text-gray-600 mb-2">
-                              <Clock size={16} />
-                              <span className="font-semibold">
+                            <div className="text-right">
+                              <div className="flex items-center justify-end gap-2 text-gray-600 mb-2">
+                                <Clock size={16} />
+                                <span className="font-semibold">
+                                  {new Date(
+                                    reservation.checkInTime
+                                  ).toLocaleDateString()}{' '}
+                                  {new Date(
+                                    reservation.checkInTime
+                                  ).toLocaleTimeString([], {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </span>
+                              </div>
+                              <div className="text-gray-600 text-sm">
+                                to{' '}
                                 {new Date(
-                                  reservation.checkInTime
+                                  reservation.checkOutTime
                                 ).toLocaleDateString()}{' '}
                                 {new Date(
-                                  reservation.checkInTime
+                                  reservation.checkOutTime
                                 ).toLocaleTimeString([], {
                                   hour: '2-digit',
                                   minute: '2-digit',
                                 })}
-                              </span>
+                              </div>
+                              {reservation.notes && (
+                                <p className="text-gray-500 text-sm mt-2 italic">
+                                  {reservation.notes}
+                                </p>
+                              )}
                             </div>
-                            <div className="text-gray-600 text-sm">
-                              to{' '}
-                              {new Date(
-                                reservation.checkOutTime
-                              ).toLocaleDateString()}{' '}
-                              {new Date(
-                                reservation.checkOutTime
-                              ).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </div>
-                            {reservation.notes && (
-                              <p className="text-gray-500 text-sm mt-2 italic">
-                                {reservation.notes}
-                              </p>
-                            )}
                           </div>
                         </div>
+
+                        <button
+                          onClick={() => handleDelete(reservation.id)}
+                          disabled={deletingId === reservation.id}
+                          className="ml-4 p-2 text-red-500 hover:bg-red-50 rounded transition disabled:opacity-50"
+                          title="Delete reservation"
+                        >
+                          {deletingId === reservation.id ? (
+                            <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Trash2 size={20} />
+                          )}
+                        </button>
                       </div>
                     ))}
                   </div>
