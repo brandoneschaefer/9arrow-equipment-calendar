@@ -1,0 +1,62 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String
+  name      String
+  hubspotId String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  reservations Reservation[]
+}
+
+model Equipment {
+  id        String     @id @default(cuid())
+  name      String
+  hubspotId String?    @unique
+  status    String     @default("available") // available, rented, maintenance
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  reservations Reservation[]
+}
+
+model Reservation {
+  id        String     @id @default(cuid())
+  equipmentId String
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  companyName    String
+  contactName    String
+  contactEmail   String?
+  contactPhone   String?
+  
+  checkInTime    DateTime
+  checkOutTime   DateTime
+  
+  notes      String?
+  hubspotDealId String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([equipmentId])
+  @@index([userId])
+  @@index([checkInTime])
+  @@index([checkOutTime])
+}
